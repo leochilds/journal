@@ -59,6 +59,7 @@ describe('server APIs', () => {
   describe('entries API', () => {
     const date = '2024-01-02';
     let entryId: string;
+    let entryTimestamp: string;
 
     beforeAll(async () => {
       await fetch(`http://localhost:${port}/api/unlock`, {
@@ -77,10 +78,17 @@ describe('server APIs', () => {
         },
         body: JSON.stringify({date, content: 'hello'}),
       });
-      const json = (await res.json()) as {id: string; content: string};
+      const json = (await res.json()) as {
+        id: string;
+        content: string;
+        timestamp: string;
+      };
       expect(res.status).toBe(201);
       expect(json.content).toBe('hello');
+      expect(typeof json.id).toBe('string');
+      expect(Date.parse(json.timestamp)).not.toBeNaN();
       entryId = json.id;
+      entryTimestamp = json.timestamp;
     });
 
     it('retrieves entries for the day', async () => {
@@ -91,10 +99,13 @@ describe('server APIs', () => {
       const json = await res.json();
       expect(res.status).toBe(200);
       expect(json.entries).toHaveLength(1);
+      expect(json.entries[0].id).toBe(entryId);
+      expect(Date.parse(json.entries[0].timestamp)).not.toBeNaN();
       expect(json.summary).toBe('');
     });
 
     it('updates an entry', async () => {
+      const newTimestamp = new Date().toISOString();
       const res = await fetch(
         `http://localhost:${port}/api/entries/${entryId}`,
         {
@@ -103,12 +114,15 @@ describe('server APIs', () => {
             'Content-Type': 'application/json',
             'X-Password': 'secret',
           },
-          body: JSON.stringify({content: 'updated'}),
+          body: JSON.stringify({content: 'updated', timestamp: newTimestamp}),
         },
       );
       const json = await res.json();
       expect(res.status).toBe(200);
+      expect(json.id).toBe(entryId);
       expect(json.content).toBe('updated');
+      expect(json.timestamp).toBe(newTimestamp);
+      entryTimestamp = json.timestamp;
     });
 
     it('updates summary', async () => {
@@ -136,6 +150,7 @@ describe('server APIs', () => {
       const json = await res.json();
       expect(json.summary).toBe('great day');
       expect(json.entries[0].content).toBe('updated');
+      expect(json.entries[0].timestamp).toBe(entryTimestamp);
     });
     it('rejects requests without password', async () => {
       const res = await fetch(
