@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import {loadEncrypted, saveEncrypted} from './utils/crypto';
 import logger from './utils/logger';
+import {Journal} from './models/journal';
 
 const publicDir = path.join(__dirname, '..', 'public');
 const dataPath = path.join(__dirname, '..', 'data.json');
@@ -11,7 +12,8 @@ const pubKeyPath = path.join(__dirname, '..', 'data.pub');
 const ensureDataFile = async (password: string): Promise<void> => {
   if (!fs.existsSync(dataPath) || !fs.existsSync(pubKeyPath)) {
     logger.info('Initialising encrypted journal');
-    await saveEncrypted(password, {title: 'Journal'}, dataPath, pubKeyPath);
+    const payload: Journal = {title: 'Journal', days: {}};
+    await saveEncrypted(password, payload, dataPath, pubKeyPath);
   } else {
     logger.debug('Encrypted journal already exists');
   }
@@ -57,7 +59,11 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
       }
       logger.info('Unlocking journal');
       await ensureDataFile(password);
-      const content = await loadEncrypted(password, dataPath, pubKeyPath);
+      const content = (await loadEncrypted(
+        password,
+        dataPath,
+        pubKeyPath,
+      )) as {payload: Journal; privateKey: string};
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(content));
     } catch (err) {

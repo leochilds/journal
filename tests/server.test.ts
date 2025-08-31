@@ -36,7 +36,8 @@ describe('unlock API', () => {
     });
     const json = await res.json();
     expect(res.status).toBe(200);
-    expect(json.payload.title).toBeDefined();
+    expect(json.payload.title).toBe('Journal');
+    expect(json.payload.days).toEqual({});
     expect(typeof json.privateKey).toBe('string');
     expect(fs.existsSync(dataFile)).toBe(true);
     expect(fs.existsSync(pubFile)).toBe(true);

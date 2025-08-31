@@ -2,13 +2,28 @@ import {promises as fs, mkdtempSync, rmSync} from 'fs';
 import os from 'os';
 import path from 'path';
 import {loadEncrypted, saveEncrypted} from '../src/utils/crypto';
+import {Journal} from '../src/models/journal';
 
 describe('encryption flow', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'journal-'));
   const dataPath = path.join(dir, 'data.json');
   const pubPath = path.join(dir, 'data.pub');
   const password = 'supersecret';
-  const payload = {entries: ['test']};
+  const payload: Journal = {
+    title: 'Test',
+    days: {
+      '2024-01-01': {
+        summary: 'New Year',
+        entries: [
+          {
+            id: '1',
+            timestamp: '2024-01-01T00:00:00.000Z',
+            content: 'Hello',
+          },
+        ],
+      },
+    },
+  };
 
   afterAll(() => rmSync(dir, {recursive: true, force: true}));
 
