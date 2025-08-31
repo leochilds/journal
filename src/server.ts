@@ -246,6 +246,16 @@ const handleSummaryPut = async (
       res.end(JSON.stringify({error: 'Invalid input'}));
       return;
     }
+    // Prevent prototype pollution via dangerous keys
+    if (
+      date === '__proto__' ||
+      date === 'constructor' ||
+      date === 'prototype'
+    ) {
+      res.statusCode = 403;
+      res.end(JSON.stringify({error: 'Forbidden date value'}));
+      return;
+    }
     const {payload} = (await loadEncrypted(
       password,
       dataPath,
