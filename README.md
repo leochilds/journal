@@ -4,7 +4,10 @@ A minimal TypeScript project for a browser-based journal client. The HTML
 interface uses vanilla JavaScript and [w3.css](https://www.w3schools.com/w3css/).
 Journal entries are encrypted locally using a symmetric key derived from a
 user-provided password. The key is never stored and session data is not
-persisted.
+persisted. Each save produces a new signing key pair: the public key is written
+to disk for verification while the private key is sealed inside the encrypted
+payload. The encrypted file also records a UTC timestamp and a SHA-256 hash of
+the ciphertext to protect against tampering.
 
 ## Project Guidelines
 
