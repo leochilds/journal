@@ -11,7 +11,7 @@
     "lint:fix": "ESLINT_USE_FLAT_CONFIG=false eslint -c .eslintrc.cjs --ext .ts src --fix",
     "check": "npm run lint && npm run build:fast",
     "watch": "onchange \"src/**/*.ts\" \"src/*.ts\" -e \"dist/*\" \"tests/*\" -- npm run check",
-    "test": "jest",
+    "test": "jest --runInBand",
     "prepare": "husky",
     "dev": "LOG_LEVEL=debug ts-node-dev --respawn src/server.ts",
     "format": "prettier --write .",
