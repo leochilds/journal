@@ -2,6 +2,8 @@
 
 A minimal TypeScript project for a browser-based journal client. The HTML
 interface uses vanilla JavaScript and [w3.css](https://www.w3schools.com/w3css/).
+After unlocking, select a date to browse entries, add new notes, edit existing
+ones, and update a daily summary.
 Journal entries are encrypted locally using a symmetric key derived from a
 user-provided password. The key is never stored and session data is not
 persisted. Each save produces a new signing key pair: the public key is written
