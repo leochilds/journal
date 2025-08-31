@@ -17,7 +17,7 @@ form.addEventListener('submit', async (e) => {
     });
     if (res.ok) {
       const data = await res.json();
-      title.textContent = data.title;
+      title.textContent = data.payload.title;
       unlockView.style.display = 'none';
       contentView.style.display = 'block';
     } else if (res.status === 400) {
