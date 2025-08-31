@@ -10,6 +10,7 @@ import {
   sign,
   verify,
 } from 'crypto';
+import logger from './logger';
 
 interface EncryptedFile {
   timestamp: string;
@@ -31,6 +32,7 @@ export const saveEncrypted = async (
   dataPath: string,
   pubKeyPath: string,
 ): Promise<void> => {
+  logger.debug(`Saving encrypted payload to ${dataPath}`);
   const salt = randomBytes(16);
   const iv = randomBytes(12);
   const key = deriveKey(password, salt);
@@ -62,6 +64,7 @@ export const saveEncrypted = async (
   await fs.writeFile(dataPath, JSON.stringify(file, null, 2));
   const pubPem = publicKey.export({format: 'pem', type: 'spki'});
   await fs.writeFile(pubKeyPath, pubPem);
+  logger.info('Encrypted payload saved');
 };
 
 export const loadEncrypted = async (
@@ -69,6 +72,7 @@ export const loadEncrypted = async (
   dataPath: string,
   pubKeyPath: string,
 ): Promise<{payload: unknown; privateKey: string}> => {
+  logger.debug(`Loading encrypted payload from ${dataPath}`);
   const [fileStr, pubPem] = await Promise.all([
     fs.readFile(dataPath, 'utf8'),
     fs.readFile(pubKeyPath, 'utf8'),
@@ -98,9 +102,11 @@ export const loadEncrypted = async (
     decipher.update(encrypted),
     decipher.final(),
   ]);
-  return JSON.parse(decrypted.toString('utf8')) as {
+  const result = JSON.parse(decrypted.toString('utf8')) as {
     payload: unknown;
     privateKey: string;
   };
+  logger.info('Encrypted payload loaded');
+  return result;
 };
 

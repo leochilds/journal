@@ -13,7 +13,7 @@
     "watch": "onchange \"src/**/*.ts\" \"src/*.ts\" -e \"dist/*\" \"tests/*\" -- npm run check",
     "test": "jest",
     "prepare": "husky",
-    "dev": "ts-node-dev --respawn src/server.ts",
+    "dev": "LOG_LEVEL=debug ts-node-dev --respawn src/server.ts",
     "format": "prettier --write .",
     "commit": "cz"
   },

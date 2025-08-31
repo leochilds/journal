@@ -35,7 +35,7 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 
 | Script | Description |
 | --- | --- |
-| `npm run dev` | Runs `watch` to rebuild and lint on file changes. |
+| `npm run dev` | Starts the server with hot reload and debug logging. |
 | `npm start` | Executes the compiled code from `dist/`. |
 | `npm run build` | Compiles TypeScript using `tsconfig.build.json`. |
 | `npm run build:fast` | Faster, less strict build for development. |
@@ -48,6 +48,16 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 ## Environment Variables
 
 No environment variables are required by default. You can supply your own via the shell or a `.env` file and access them with `process.env`.
+
+## Logging
+
+Logging is handled by a [Winston](https://github.com/winstonjs/winston) logger. The default log level is `info`, which includes `info`, `warn`, and `error` messages. To adjust the verbosity, set the `LOG_LEVEL` environment variable to one of `error`, `warn`, `info`, or `debug`:
+
+```bash
+LOG_LEVEL=warn npm start
+```
+
+The `npm run dev` script sets `LOG_LEVEL=debug` so development runs show debug messages. Avoid logging secrets such as passwords or private keys.
 
 ## Commit Conventions
 
@@ -73,8 +83,9 @@ Load and validate these variables in code through `src/config.ts`:
 
 ```ts
 import config from './config';
+import logger from './utils/logger';
 
-console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+logger.info(`Running in ${config.nodeEnv} mode on port ${config.port}`);
 ```
 
 ## EditorConfig
