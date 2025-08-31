@@ -1,6 +1,15 @@
-# typescript-starter
+# Journal
 
-TypeScript starter template with Jest for testing, ESLint for linting, and Winston for logging.
+A minimal TypeScript project for a browser-based journal client. The HTML
+interface uses vanilla JavaScript and [w3.css](https://www.w3schools.com/w3css/).
+Journal entries are encrypted locally using a symmetric key derived from a
+user-provided password. The key is never stored and session data is not
+persisted.
+
+## Project Guidelines
+
+See [AGENTS.md](AGENTS.md) for project structure, coding style, and workflow
+details.
 
 ## Prerequisites
 
@@ -33,7 +42,7 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 
 ## Environment Variables
 
-No environment variables are required by default. You can supply your own variables via the shell or a `.env` file and access them with `process.env`.
+No environment variables are required by default. You can supply your own via the shell or a `.env` file and access them with `process.env`.
 
 ## Commit Conventions
 
@@ -49,8 +58,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
 
 ## Configuration
 
-Environment variables are managed with [dotenv](https://www.npmjs.com/package/dotenv).
-Create a `.env` file by copying `.env.example` and updating the values as needed:
+Environment variables are managed with [dotenv](https://www.npmjs.com/package/dotenv). Create a `.env` file by copying `.env.example` and updating the values as needed:
 
 ```bash
 cp .env.example .env
@@ -66,9 +74,4 @@ console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
 
 ## EditorConfig
 
-This project includes an `.editorconfig` file to enforce consistent coding styles.
-Install an EditorConfig plugin for your editor to automatically apply these settings.
-
-## Scripts
-
-- `npm run dev` - Runs `src/index.ts` using ts-node-dev, automatically restarting on file changes.
+This project includes an `.editorconfig` file to enforce consistent coding styles. Install an EditorConfig plugin for your editor to automatically apply these settings.
