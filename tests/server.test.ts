@@ -141,6 +141,32 @@ describe('server APIs', () => {
       expect(json.summary).toBe('great day');
       expect(json.entries[0].content).toBe('updated');
     });
+
+    it('resets write lock after failed update', async () => {
+      const bad = await fetch(
+        `http://localhost:${port}/api/entries/nonexistent`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-password': 'secret',
+          },
+          body: JSON.stringify({content: 'bogus'}),
+        },
+      );
+      expect(bad.status).toBe(404);
+      const res = await fetch(`http://localhost:${port}/api/entries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-password': 'secret',
+        },
+        body: JSON.stringify({date, content: 'after fail'}),
+      });
+      const json = await res.json();
+      expect(res.status).toBe(201);
+      expect(json.content).toBe('after fail');
+    });
   });
 });
 

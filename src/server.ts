@@ -33,7 +33,7 @@ const updateJournal = async <T>(
   fn: (journal: Journal) => T | Promise<T>,
 ): Promise<T> => {
   let result: T;
-  writeLock = writeLock.then(async () => {
+  const current = writeLock.then(async () => {
     const {payload} = (await loadEncrypted(
       password,
       dataPath,
@@ -43,7 +43,10 @@ const updateJournal = async <T>(
     result = await fn(journal);
     await saveEncrypted(password, journal, dataPath, pubKeyPath);
   });
-  await writeLock;
+  writeLock = current.catch((err) => {
+    logger.error(`Journal update failed: ${(err as Error).message}`);
+  });
+  await current;
   return result!;
 };
 
