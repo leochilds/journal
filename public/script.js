@@ -110,7 +110,8 @@ form.addEventListener('submit', async (e) => {
       unlockView.style.display = 'none';
       contentView.style.display = 'block';
       password = pwd;
-      datePicker.value = new Date().toISOString().split('T')[0];
+      // prefill with the user's local date in YYYY-MM-DD format
+      datePicker.value = new Date().toLocaleDateString('en-CA');
       loadDay(datePicker.value);
     } else if (res.status === 400) {
       const data = await res.json().catch(() => ({}));
