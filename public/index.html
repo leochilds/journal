@@ -16,8 +16,24 @@
         <p id="error" class="w3-text-red"></p>
       </form>
     </div>
-    <div id="content-view" class="w3-card w3-padding w3-margin-top w3-center" style="display:none">
-      <h1 id="title"></h1>
+    <div id="content-view" class="w3-card w3-padding w3-margin-top" style="display:none">
+      <h1 id="title" class="w3-center"></h1>
+      <input id="date-picker" class="w3-input w3-margin-top" type="date" />
+      <div class="w3-margin-top">
+        <label for="summary">Summary</label>
+        <textarea id="summary" class="w3-input"></textarea>
+        <button id="save-summary" class="w3-button w3-blue w3-margin-top">
+          Save Summary
+        </button>
+      </div>
+      <div class="w3-margin-top">
+        <label for="new-entry">New Entry</label>
+        <textarea id="new-entry" class="w3-input"></textarea>
+        <button id="add-entry" class="w3-button w3-green w3-margin-top">
+          Add Entry
+        </button>
+      </div>
+      <ul id="entries" class="w3-ul w3-margin-top"></ul>
     </div>
   </div>
   <script src="script.js"></script>
