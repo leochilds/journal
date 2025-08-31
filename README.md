@@ -31,6 +31,17 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 3. Start the server: `npm start` and visit http://localhost:3000.
 4. Use the npm scripts below to develop, test, and build the project.
 
+## API Endpoints
+
+The server exposes a small JSON API. All endpoints except `/api/unlock` require
+an `X-Password` header containing the user's password:
+
+- `POST /api/unlock` – supply `{password}` to decrypt the journal.
+- `GET /api/entries?date=YYYY-MM-DD` – retrieve `{summary, entries}` for a day.
+- `POST /api/entries` – send `{date, content}` to append a new entry.
+- `PUT /api/entries/:id` – update an entry's `{content}` and optional `timestamp`.
+- `PUT /api/summary/:date` – update the summary for the given day.
+
 ## npm Scripts
 
 | Script | Description |
