@@ -1,13 +1,32 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import {randomUUID} from 'crypto';
 import {loadEncrypted, saveEncrypted} from './utils/crypto';
 import logger from './utils/logger';
-import {Journal} from './models/journal';
+import {Journal, Day, Entry} from './models/journal';
 
 const publicDir = path.join(__dirname, '..', 'public');
 const dataPath = path.join(__dirname, '..', 'data.json');
 const pubKeyPath = path.join(__dirname, '..', 'data.pub');
+
+let currentPassword: string | null = null;
+
+const parseJson = (req: http.IncomingMessage): Promise<unknown> => {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error('Invalid JSON'));
+      }
+    });
+  });
+};
 
 const ensureDataFile = async (password: string): Promise<void> => {
   if (!fs.existsSync(dataPath) || !fs.existsSync(pubKeyPath)) {
@@ -64,6 +83,7 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
         dataPath,
         pubKeyPath,
       )) as {payload: Journal; privateKey: string};
+      currentPassword = password;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(content));
     } catch (err) {
@@ -74,11 +94,194 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
   });
 };
 
+const requireUnlocked = (res: http.ServerResponse): boolean => {
+  if (!currentPassword) {
+    res.statusCode = 403;
+    res.end(JSON.stringify({error: 'Locked'}));
+    return false;
+  }
+  return true;
+};
+
+const handleEntriesGet = async (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<void> => {
+  if (!requireUnlocked(res) || !req.url) return;
+  const url = new URL(req.url, 'http://localhost');
+  const date = url.searchParams.get('date');
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({error: 'Invalid date'}));
+    return;
+  }
+  try {
+    const {payload} = (await loadEncrypted(
+      currentPassword as string,
+      dataPath,
+      pubKeyPath,
+    )) as {payload: Journal};
+    const journal = payload as Journal;
+    const day: Day = journal.days[date] || {summary: '', entries: []};
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(day));
+  } catch (err) {
+    logger.error(`Entries get failed: ${(err as Error).message}`);
+    res.statusCode = 500;
+    res.end(JSON.stringify({error: 'Server error'}));
+  }
+};
+
+const handleEntriesPost = async (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<void> => {
+  if (!requireUnlocked(res)) return;
+  try {
+    const {date, content} = (await parseJson(req)) as {
+      date?: string;
+      content?: string;
+    };
+    if (
+      !date ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      !content ||
+      content.length === 0
+    ) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({error: 'Invalid input'}));
+      return;
+    }
+    const {payload} = (await loadEncrypted(
+      currentPassword as string,
+      dataPath,
+      pubKeyPath,
+    )) as {payload: Journal};
+    const journal = payload as Journal;
+    if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
+    const entry: Entry = {
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      content,
+    };
+    journal.days[date].entries.push(entry);
+    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    res.statusCode = 201;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(entry));
+  } catch (err) {
+    logger.error(`Entries post failed: ${(err as Error).message}`);
+    res.statusCode = 500;
+    res.end(JSON.stringify({error: 'Server error'}));
+  }
+};
+
+const handleEntryPut = async (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  id: string,
+): Promise<void> => {
+  if (!requireUnlocked(res)) return;
+  try {
+    const {content, timestamp} = (await parseJson(req)) as {
+      content?: string;
+      timestamp?: string;
+    };
+    if (!content || content.length === 0) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({error: 'Invalid input'}));
+      return;
+    }
+    if (timestamp && Number.isNaN(Date.parse(timestamp))) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({error: 'Invalid timestamp'}));
+      return;
+    }
+    const {payload} = (await loadEncrypted(
+      currentPassword as string,
+      dataPath,
+      pubKeyPath,
+    )) as {payload: Journal};
+    const journal = payload as Journal;
+    let found: Entry | null = null;
+    Object.values(journal.days).forEach((day) => {
+      day.entries.forEach((entry) => {
+        if (entry.id === id) {
+          entry.content = content;
+          if (timestamp) entry.timestamp = timestamp;
+          found = entry;
+        }
+      });
+    });
+    if (!found) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({error: 'Entry not found'}));
+      return;
+    }
+    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(found));
+  } catch (err) {
+    logger.error(`Entry update failed: ${(err as Error).message}`);
+    res.statusCode = 500;
+    res.end(JSON.stringify({error: 'Server error'}));
+  }
+};
+
+const handleSummaryPut = async (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  date: string,
+): Promise<void> => {
+  if (!requireUnlocked(res)) return;
+  try {
+    const {summary} = (await parseJson(req)) as {summary?: string};
+    if (!summary) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({error: 'Invalid input'}));
+      return;
+    }
+    const {payload} = (await loadEncrypted(
+      currentPassword as string,
+      dataPath,
+      pubKeyPath,
+    )) as {payload: Journal};
+    const journal = payload as Journal;
+    if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
+    journal.days[date].summary = summary;
+    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(journal.days[date]));
+  } catch (err) {
+    logger.error(`Summary update failed: ${(err as Error).message}`);
+    res.statusCode = 500;
+    res.end(JSON.stringify({error: 'Server error'}));
+  }
+};
+
 export const createServer = (): http.Server => {
-  return http.createServer((req, res) => {
+  return http.createServer(async (req, res) => {
     logger.debug(`${req.method} ${req.url}`);
     if (req.url === '/api/unlock' && req.method === 'POST') {
       handleUnlock(req, res);
+      return;
+    }
+    if (req.url?.startsWith('/api/entries') && req.method === 'GET') {
+      await handleEntriesGet(req, res);
+      return;
+    }
+    if (req.url === '/api/entries' && req.method === 'POST') {
+      await handleEntriesPost(req, res);
+      return;
+    }
+    const entryMatch = req.url?.match(/^\/api\/entries\/([^/?]+)$/);
+    if (entryMatch && req.method === 'PUT') {
+      await handleEntryPut(req, res, entryMatch[1]);
+      return;
+    }
+    const summaryMatch = req.url?.match(/^\/api\/summary\/(\d{4}-\d{2}-\d{2})$/);
+    if (summaryMatch && req.method === 'PUT') {
+      await handleSummaryPut(req, res, summaryMatch[1]);
       return;
     }
     if (serveStatic(req, res)) return;
