@@ -10,7 +10,44 @@ const publicDir = path.join(__dirname, '..', 'public');
 const dataPath = path.join(__dirname, '..', 'data.json');
 const pubKeyPath = path.join(__dirname, '..', 'data.pub');
 
-let currentPassword: string | null = null;
+let writeLock: Promise<void> = Promise.resolve();
+
+class NotFoundError extends Error {}
+
+const getPassword = (req: http.IncomingMessage): string | null => {
+  const pwd = req.headers['x-password'];
+  if (typeof pwd !== 'string' || pwd.length === 0) return null;
+  return pwd;
+};
+
+const readJournal = async (password: string): Promise<Journal> => {
+  await writeLock;
+  const {payload} = (await loadEncrypted(
+    password,
+    dataPath,
+    pubKeyPath,
+  )) as {payload: Journal};
+  return payload as Journal;
+};
+
+const updateJournal = async <T>(
+  password: string,
+  fn: (journal: Journal) => T | Promise<T>,
+): Promise<T> => {
+  let result: T;
+  writeLock = writeLock.then(async () => {
+    const {payload} = (await loadEncrypted(
+      password,
+      dataPath,
+      pubKeyPath,
+    )) as {payload: Journal};
+    const journal = payload as Journal;
+    result = await fn(journal);
+    await saveEncrypted(password, journal, dataPath, pubKeyPath);
+  });
+  await writeLock;
+  return result!;
+};
 
 const parseJson = (req: http.IncomingMessage): Promise<unknown> => {
   return new Promise((resolve, reject) => {
@@ -83,7 +120,6 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
         dataPath,
         pubKeyPath,
       )) as {payload: Journal; privateKey: string};
-      currentPassword = password;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(content));
     } catch (err) {
@@ -94,20 +130,16 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
   });
 };
 
-const requireUnlocked = (res: http.ServerResponse): boolean => {
-  if (!currentPassword) {
-    res.statusCode = 403;
-    res.end(JSON.stringify({error: 'Locked'}));
-    return false;
-  }
-  return true;
-};
-
 const handleEntriesGet = async (
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> => {
-  if (!requireUnlocked(res) || !req.url) return;
+  const password = getPassword(req);
+  if (!password || !req.url) {
+    res.statusCode = 403;
+    res.end(JSON.stringify({error: 'Locked'}));
+    return;
+  }
   const url = new URL(req.url, 'http://localhost');
   const date = url.searchParams.get('date');
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -116,12 +148,7 @@ const handleEntriesGet = async (
     return;
   }
   try {
-    const {payload} = (await loadEncrypted(
-      currentPassword as string,
-      dataPath,
-      pubKeyPath,
-    )) as {payload: Journal};
-    const journal = payload as Journal;
+    const journal = await readJournal(password);
     const day: Day = journal.days[date] || {summary: '', entries: []};
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(day));
@@ -136,7 +163,12 @@ const handleEntriesPost = async (
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> => {
-  if (!requireUnlocked(res)) return;
+  const password = getPassword(req);
+  if (!password) {
+    res.statusCode = 403;
+    res.end(JSON.stringify({error: 'Locked'}));
+    return;
+  }
   try {
     const {date, content} = (await parseJson(req)) as {
       date?: string;
@@ -152,20 +184,16 @@ const handleEntriesPost = async (
       res.end(JSON.stringify({error: 'Invalid input'}));
       return;
     }
-    const {payload} = (await loadEncrypted(
-      currentPassword as string,
-      dataPath,
-      pubKeyPath,
-    )) as {payload: Journal};
-    const journal = payload as Journal;
-    if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
-    const entry: Entry = {
-      id: randomUUID(),
-      timestamp: new Date().toISOString(),
-      content,
-    };
-    journal.days[date].entries.push(entry);
-    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    const entry = await updateJournal(password, (journal) => {
+      if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
+      const newEntry: Entry = {
+        id: randomUUID(),
+        timestamp: new Date().toISOString(),
+        content,
+      };
+      journal.days[date].entries.push(newEntry);
+      return newEntry;
+    });
     res.statusCode = 201;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(entry));
@@ -181,7 +209,12 @@ const handleEntryPut = async (
   res: http.ServerResponse,
   id: string,
 ): Promise<void> => {
-  if (!requireUnlocked(res)) return;
+  const password = getPassword(req);
+  if (!password) {
+    res.statusCode = 403;
+    res.end(JSON.stringify({error: 'Locked'}));
+    return;
+  }
   try {
     const {content, timestamp} = (await parseJson(req)) as {
       content?: string;
@@ -197,33 +230,32 @@ const handleEntryPut = async (
       res.end(JSON.stringify({error: 'Invalid timestamp'}));
       return;
     }
-    const {payload} = (await loadEncrypted(
-      currentPassword as string,
-      dataPath,
-      pubKeyPath,
-    )) as {payload: Journal};
-    const journal = payload as Journal;
-    let found: Entry | null = null;
-    Object.values(journal.days).forEach((day) => {
-      day.entries.forEach((entry) => {
-        if (entry.id === id) {
-          entry.content = content;
-          if (timestamp) entry.timestamp = timestamp;
-          found = entry;
-        }
+    const found = await updateJournal(password, (journal) => {
+      let match: Entry | null = null;
+      Object.values(journal.days).forEach((day) => {
+        day.entries.forEach((entry) => {
+          if (entry.id === id) {
+            entry.content = content;
+            if (timestamp) entry.timestamp = timestamp;
+            match = entry;
+          }
+        });
       });
+      if (!match) throw new NotFoundError();
+      return match;
     });
-    if (!found) {
-      res.statusCode = 404;
-      res.end(JSON.stringify({error: 'Entry not found'}));
-      return;
-    }
-    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(found));
   } catch (err) {
+    if (err instanceof NotFoundError) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({error: 'Entry not found'}));
+      return;
+    }
     logger.error(`Entry update failed: ${(err as Error).message}`);
     res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({error: 'Server error'}));
   }
 };
@@ -233,7 +265,12 @@ const handleSummaryPut = async (
   res: http.ServerResponse,
   date: string,
 ): Promise<void> => {
-  if (!requireUnlocked(res)) return;
+  const password = getPassword(req);
+  if (!password) {
+    res.statusCode = 403;
+    res.end(JSON.stringify({error: 'Locked'}));
+    return;
+  }
   try {
     const {summary} = (await parseJson(req)) as {summary?: string};
     if (!summary) {
@@ -241,17 +278,13 @@ const handleSummaryPut = async (
       res.end(JSON.stringify({error: 'Invalid input'}));
       return;
     }
-    const {payload} = (await loadEncrypted(
-      currentPassword as string,
-      dataPath,
-      pubKeyPath,
-    )) as {payload: Journal};
-    const journal = payload as Journal;
-    if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
-    journal.days[date].summary = summary;
-    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    const day = await updateJournal(password, (journal) => {
+      if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
+      journal.days[date].summary = summary;
+      return journal.days[date];
+    });
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify(journal.days[date]));
+    res.end(JSON.stringify(day));
   } catch (err) {
     logger.error(`Summary update failed: ${(err as Error).message}`);
     res.statusCode = 500;

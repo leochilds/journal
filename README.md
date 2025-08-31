@@ -36,6 +36,7 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 The server exposes a small JSON API:
 
 - `POST /api/unlock` – supply `{password}` to decrypt the journal.
+- All other endpoints require the password in an `x-password` header.
 - `GET /api/entries?date=YYYY-MM-DD` – retrieve `{summary, entries}` for a day.
 - `POST /api/entries` – send `{date, content}` to append a new entry.
 - `PUT /api/entries/:id` – update an entry's `{content}` and optional `timestamp`.

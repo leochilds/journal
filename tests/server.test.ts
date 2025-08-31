@@ -71,7 +71,10 @@ describe('server APIs', () => {
     it('appends an entry', async () => {
       const res = await fetch(`http://localhost:${port}/api/entries`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-password': 'secret',
+        },
         body: JSON.stringify({date, content: 'hello'}),
       });
       const json = (await res.json()) as {id: string; content: string};
@@ -83,6 +86,9 @@ describe('server APIs', () => {
     it('retrieves entries for the day', async () => {
       const res = await fetch(
         `http://localhost:${port}/api/entries?date=${date}`,
+        {
+          headers: {'x-password': 'secret'},
+        },
       );
       const json = await res.json();
       expect(res.status).toBe(200);
@@ -95,7 +101,10 @@ describe('server APIs', () => {
         `http://localhost:${port}/api/entries/${entryId}`,
         {
           method: 'PUT',
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'x-password': 'secret',
+          },
           body: JSON.stringify({content: 'updated'}),
         },
       );
@@ -109,7 +118,10 @@ describe('server APIs', () => {
         `http://localhost:${port}/api/summary/${date}`,
         {
           method: 'PUT',
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'x-password': 'secret',
+          },
           body: JSON.stringify({summary: 'great day'}),
         },
       );
@@ -121,6 +133,9 @@ describe('server APIs', () => {
     it('reflects updates when fetching day', async () => {
       const res = await fetch(
         `http://localhost:${port}/api/entries?date=${date}`,
+        {
+          headers: {'x-password': 'secret'},
+        },
       );
       const json = await res.json();
       expect(json.summary).toBe('great day');
