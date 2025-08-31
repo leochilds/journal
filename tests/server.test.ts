@@ -36,4 +36,14 @@ describe('unlock API', () => {
     expect(json.title).toBeDefined();
     expect(fs.existsSync(dataFile)).toBe(true);
   });
+  it('responds with 400 when password missing', async () => {
+    const res = await fetch(`http://localhost:${port}/api/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: '' }),
+    });
+    const json = await res.json();
+    expect(res.status).toBe(400);
+    expect(json.error).toBeDefined();
+  });
 });

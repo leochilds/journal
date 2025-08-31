@@ -6,13 +6,20 @@
   <title>Journal</title>
   <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
 </head>
-<body class="w3-container">
-  <form id="unlock-form" class="w3-margin-top">
-    <label for="password">Password</label>
-    <input class="w3-input w3-margin-bottom" type="password" id="password" />
-    <button class="w3-button w3-blue" type="submit">Unlock</button>
-  </form>
-  <h1 id="title" class="w3-center"></h1>
+<body>
+  <div class="w3-container" style="max-width:600px;margin:auto">
+    <div id="unlock-view" class="w3-card w3-padding w3-margin-top">
+      <form id="unlock-form">
+        <label for="password">Password</label>
+        <input class="w3-input w3-margin-bottom" type="password" id="password" />
+        <button class="w3-button w3-blue" type="submit">Unlock</button>
+        <p id="error" class="w3-text-red"></p>
+      </form>
+    </div>
+    <div id="content-view" class="w3-card w3-padding w3-margin-top w3-center" style="display:none">
+      <h1 id="title"></h1>
+    </div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>
