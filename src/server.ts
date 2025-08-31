@@ -10,8 +10,6 @@ const publicDir = path.join(__dirname, '..', 'public');
 const dataPath = path.join(__dirname, '..', 'data.json');
 const pubKeyPath = path.join(__dirname, '..', 'data.pub');
 
-let currentPassword: string | null = null;
-
 const parseJson = (req: http.IncomingMessage): Promise<unknown> => {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -26,6 +24,19 @@ const parseJson = (req: http.IncomingMessage): Promise<unknown> => {
       }
     });
   });
+};
+
+const getPassword = (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): string | null => {
+  const header = req.headers['x-password'];
+  if (typeof header !== 'string' || header.length === 0) {
+    res.statusCode = 403;
+    res.end(JSON.stringify({error: 'Password required'}));
+    return null;
+  }
+  return header;
 };
 
 const ensureDataFile = async (password: string): Promise<void> => {
@@ -83,7 +94,6 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
         dataPath,
         pubKeyPath,
       )) as {payload: Journal; privateKey: string};
-      currentPassword = password;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(content));
     } catch (err) {
@@ -94,20 +104,12 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
   });
 };
 
-const requireUnlocked = (res: http.ServerResponse): boolean => {
-  if (!currentPassword) {
-    res.statusCode = 403;
-    res.end(JSON.stringify({error: 'Locked'}));
-    return false;
-  }
-  return true;
-};
-
 const handleEntriesGet = async (
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> => {
-  if (!requireUnlocked(res) || !req.url) return;
+  const password = getPassword(req, res);
+  if (!password || !req.url) return;
   const url = new URL(req.url, 'http://localhost');
   const date = url.searchParams.get('date');
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -117,7 +119,7 @@ const handleEntriesGet = async (
   }
   try {
     const {payload} = (await loadEncrypted(
-      currentPassword as string,
+      password,
       dataPath,
       pubKeyPath,
     )) as {payload: Journal};
@@ -136,7 +138,8 @@ const handleEntriesPost = async (
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): Promise<void> => {
-  if (!requireUnlocked(res)) return;
+  const password = getPassword(req, res);
+  if (!password) return;
   try {
     const {date, content} = (await parseJson(req)) as {
       date?: string;
@@ -153,7 +156,7 @@ const handleEntriesPost = async (
       return;
     }
     const {payload} = (await loadEncrypted(
-      currentPassword as string,
+      password,
       dataPath,
       pubKeyPath,
     )) as {payload: Journal};
@@ -165,7 +168,7 @@ const handleEntriesPost = async (
       content,
     };
     journal.days[date].entries.push(entry);
-    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    await saveEncrypted(password, journal, dataPath, pubKeyPath);
     res.statusCode = 201;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(entry));
@@ -181,7 +184,8 @@ const handleEntryPut = async (
   res: http.ServerResponse,
   id: string,
 ): Promise<void> => {
-  if (!requireUnlocked(res)) return;
+  const password = getPassword(req, res);
+  if (!password) return;
   try {
     const {content, timestamp} = (await parseJson(req)) as {
       content?: string;
@@ -198,7 +202,7 @@ const handleEntryPut = async (
       return;
     }
     const {payload} = (await loadEncrypted(
-      currentPassword as string,
+      password,
       dataPath,
       pubKeyPath,
     )) as {payload: Journal};
@@ -218,7 +222,7 @@ const handleEntryPut = async (
       res.end(JSON.stringify({error: 'Entry not found'}));
       return;
     }
-    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    await saveEncrypted(password, journal, dataPath, pubKeyPath);
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(found));
   } catch (err) {
@@ -233,7 +237,8 @@ const handleSummaryPut = async (
   res: http.ServerResponse,
   date: string,
 ): Promise<void> => {
-  if (!requireUnlocked(res)) return;
+  const password = getPassword(req, res);
+  if (!password) return;
   try {
     const {summary} = (await parseJson(req)) as {summary?: string};
     if (!summary) {
@@ -242,14 +247,14 @@ const handleSummaryPut = async (
       return;
     }
     const {payload} = (await loadEncrypted(
-      currentPassword as string,
+      password,
       dataPath,
       pubKeyPath,
     )) as {payload: Journal};
     const journal = payload as Journal;
     if (!journal.days[date]) journal.days[date] = {summary: '', entries: []};
     journal.days[date].summary = summary;
-    await saveEncrypted(currentPassword as string, journal, dataPath, pubKeyPath);
+    await saveEncrypted(password, journal, dataPath, pubKeyPath);
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(journal.days[date]));
   } catch (err) {

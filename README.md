@@ -33,7 +33,8 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 
 ## API Endpoints
 
-The server exposes a small JSON API:
+The server exposes a small JSON API. All endpoints except `/api/unlock` require
+an `X-Password` header containing the user's password:
 
 - `POST /api/unlock` – supply `{password}` to decrypt the journal.
 - `GET /api/entries?date=YYYY-MM-DD` – retrieve `{summary, entries}` for a day.
