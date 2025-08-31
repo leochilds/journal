@@ -1,9 +1,10 @@
-import { createServer } from '../src/server';
+import {createServer} from '../src/server';
 import fs from 'fs';
 import path from 'path';
-import { AddressInfo } from 'net';
+import {AddressInfo} from 'net';
 
 const dataFile = path.join(__dirname, '..', 'data.json');
+const pubFile = path.join(__dirname, '..', 'data.pub');
 
 describe('unlock API', () => {
   let server: ReturnType<typeof createServer>;
@@ -22,19 +23,23 @@ describe('unlock API', () => {
   afterAll(() => {
     server.close();
     if (fs.existsSync(dataFile)) fs.unlinkSync(dataFile);
+    if (fs.existsSync(pubFile)) fs.unlinkSync(pubFile);
   });
 
-  it('creates data file and returns title', async () => {
+  it('creates encrypted data file and returns payload', async () => {
     if (fs.existsSync(dataFile)) fs.unlinkSync(dataFile);
+    if (fs.existsSync(pubFile)) fs.unlinkSync(pubFile);
     const res = await fetch(`http://localhost:${port}/api/unlock`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: 'secret' }),
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password: 'secret'}),
     });
     const json = await res.json();
     expect(res.status).toBe(200);
-    expect(json.title).toBeDefined();
+    expect(json.payload.title).toBeDefined();
+    expect(typeof json.privateKey).toBe('string');
     expect(fs.existsSync(dataFile)).toBe(true);
+    expect(fs.existsSync(pubFile)).toBe(true);
   });
   it('responds with 400 when password missing', async () => {
     const res = await fetch(`http://localhost:${port}/api/unlock`, {
