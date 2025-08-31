@@ -1,13 +1,15 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import {loadEncrypted, saveEncrypted} from './utils/crypto';
 
 const publicDir = path.join(__dirname, '..', 'public');
 const dataPath = path.join(__dirname, '..', 'data.json');
+const pubKeyPath = path.join(__dirname, '..', 'data.pub');
 
-const ensureDataFile = (): void => {
-  if (!fs.existsSync(dataPath)) {
-    fs.writeFileSync(dataPath, JSON.stringify({ title: 'Journal' }, null, 2));
+const ensureDataFile = async (password: string): Promise<void> => {
+  if (!fs.existsSync(dataPath) || !fs.existsSync(pubKeyPath)) {
+    await saveEncrypted(password, {title: 'Journal'}, dataPath, pubKeyPath);
   }
 };
 
@@ -38,21 +40,21 @@ const handleUnlock = (req: http.IncomingMessage, res: http.ServerResponse): void
   req.on('data', (chunk) => {
     body += chunk;
   });
-  req.on('end', () => {
+  req.on('end', async () => {
     try {
-      const { password } = JSON.parse(body);
+      const {password} = JSON.parse(body);
       if (!password || password.length === 0) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: 'Password required' }));
+        res.end(JSON.stringify({error: 'Password required'}));
         return;
       }
-      ensureDataFile();
-      const content = fs.readFileSync(dataPath, 'utf8');
+      await ensureDataFile(password);
+      const content = await loadEncrypted(password, dataPath, pubKeyPath);
       res.setHeader('Content-Type', 'application/json');
-      res.end(content);
+      res.end(JSON.stringify(content));
     } catch {
       res.statusCode = 500;
-      res.end(JSON.stringify({ error: 'Server error' }));
+      res.end(JSON.stringify({error: 'Server error'}));
     }
   });
 };
