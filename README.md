@@ -24,7 +24,9 @@ This project targets the latest Node.js LTS release. Ensure your environment use
 ## Running Locally
 
 1. Install dependencies: `npm install`.
-2. Use the npm scripts below to develop, test, and build the project.
+2. Build the project: `npm run build`.
+3. Start the server: `npm start` and visit http://localhost:3000.
+4. Use the npm scripts below to develop, test, and build the project.
 
 ## npm Scripts
 
